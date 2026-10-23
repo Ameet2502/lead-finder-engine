@@ -121,6 +121,7 @@ function port25Open() {
         const j = {};
         for (const a of n.parameters.assignments.assignments) j[a.name] = evalValue(a.value, a.type);
         if (process.env.RUN_MODE && 'run_mode' in j) j.run_mode = process.env.RUN_MODE;
+        for (const k of Object.keys(j)) if (process.env['SET_' + k] !== undefined && process.env['SET_' + k] !== '') j[k] = typeof j[k] === 'number' ? Number(process.env['SET_' + k]) : process.env['SET_' + k];   // override any setting from the workflow file
         if (!p25 && 'smtp_selfcheck' in j) j.smtp_selfcheck = false;
         try { const ch = await usage.begin(j); if (ch.length) console.log("Today's fair share of free limits: " + ch.join(', ')); } catch (e) { console.log('Usage tab: ' + e.message); }
         outputs[name] = [{ json: j }];
