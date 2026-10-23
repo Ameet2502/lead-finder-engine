@@ -43,11 +43,15 @@ jobs:
           TAVILY_DAILY_CAP: '500'
           EXA_DAILY_CAP: '500'
           FIRECRAWL_DAILY_CAP: '500'
-          LINKUP_DAILY_CAP: '70'
-          SERPER_DAILY_CAP: '80'
+          LINKUP_DAILY_CAP: '1000'
+          SERPER_DAILY_CAP: '1000'
           REOON_DAILY_CAP: '2000'
           VERIFIED_PER_SECTION: '50'
           SHADY_PER_SECTION: '50'
+          # search order: monthly free ones first (Tavily, Exa, Firecrawl), then one-time credits (Linkup, Serper) with no daily ceiling
+          SET_max_queries_per_track: '150'
+          SET_max_searches_per_node: '150'
+          TOTAL_VERIFIED_TARGET: '100'
           RUN_MODE: ${{ inputs.mode == 'auto' && '' || inputs.mode }}
         run: node run.js Daily_Lead_Engine.json --state state/daily.json
       - name: Save memory for next run
