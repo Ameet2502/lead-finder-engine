@@ -1,0 +1,33 @@
+name: Email Checker
+# every hour at :25 - checks unsent leads (next-to-be-sent first), once each
+on:
+  schedule:
+    - cron: '25 * * * *'
+  workflow_dispatch:
+concurrency: { group: email-checker, cancel-in-progress: false }
+permissions: { contents: read, actions: write }
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - name: Load memory from last run
+        uses: actions/cache/restore@v4
+        with: { path: state, key: 'checker-state-${{ github.run_id }}', restore-keys: 'checker-state-' }
+      - name: Run Email Checker
+        env:
+          KEYS_TXT: ${{ secrets.KEYS_TXT }}
+        run: node engine/run.js workflows/Email_Checker.json --state state/checker.json
+      - name: Save memory for next run
+        if: always()
+        uses: actions/cache/save@v4
+        with: { path: state, key: 'checker-state-${{ github.run_id }}' }
+      - name: Keep the schedules switched on (GitHub pauses them after 60 quiet days)
+        if: always()
+        env: { GH_TOKEN: '${{ github.token }}' }
+        run: |
+          gh api -X PUT "repos/${{ github.repository }}/actions/workflows/daily.yml/enable" || true
+          gh api -X PUT "repos/${{ github.repository }}/actions/workflows/checker.yml/enable" || true
