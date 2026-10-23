@@ -20,7 +20,7 @@ jobs:
       - name: Run Email Checker
         env:
           KEYS_TXT: ${{ secrets.KEYS_TXT }}
-        run: node engine/run.js workflows/Email_Checker.json --state state/checker.json
+        run: node run.js Email_Checker.json --state state/checker.json
       - name: Save memory for next run
         if: always()
         uses: actions/cache/save@v4
