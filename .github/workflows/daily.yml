@@ -1,0 +1,35 @@
+name: Daily Lead Engine
+# 7:47 AM IST = people + emails + jobs (full run).  5:53 PM IST = jobs only.
+on:
+  schedule:
+    - cron: '17 2 * * *'
+    - cron: '23 12 * * *'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'full = people + jobs, light = jobs only, auto = by time of day'
+        default: full
+        type: choice
+        options: [full, light, auto]
+concurrency: { group: daily-engine, cancel-in-progress: false }
+permissions: { contents: read, actions: write }
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - name: Load memory from last run
+        uses: actions/cache/restore@v4
+        with: { path: state, key: 'daily-state-${{ github.run_id }}', restore-keys: 'daily-state-' }
+      - name: Run Daily Lead Engine
+        env:
+          KEYS_TXT: ${{ secrets.KEYS_TXT }}
+          RUN_MODE: ${{ inputs.mode == 'auto' && '' || inputs.mode }}
+        run: node engine/run.js workflows/Daily_Lead_Engine.json --state state/daily.json
+      - name: Save memory for next run
+        if: always()
+        uses: actions/cache/save@v4
+        with: { path: state, key: 'daily-state-${{ github.run_id }}' }
