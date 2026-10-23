@@ -28,7 +28,7 @@ jobs:
         env:
           KEYS_TXT: ${{ secrets.KEYS_TXT }}
           RUN_MODE: ${{ inputs.mode == 'auto' && '' || inputs.mode }}
-        run: node engine/run.js workflows/Daily_Lead_Engine.json --state state/daily.json
+        run: node run.js Daily_Lead_Engine.json --state state/daily.json
       - name: Save memory for next run
         if: always()
         uses: actions/cache/save@v4
