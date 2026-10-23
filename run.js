@@ -111,6 +111,7 @@ function port25Open() {
   const p25 = process.env.SMTP_SELFCHECK === 'false' ? false : await port25Open();
   console.log('Free mail-server check (port 25): ' + (p25 ? 'available' : 'blocked here - using email-check APIs only'));
   const summary = { workflow: wf.name, port25: p25, steps: [] };
+  const usage = require('./usage').makeUsage(process.env, staticData);
   let failed = false;
   for (const name of order) {
     const n = byName[name];
@@ -121,6 +122,7 @@ function port25Open() {
         for (const a of n.parameters.assignments.assignments) j[a.name] = evalValue(a.value, a.type);
         if (process.env.RUN_MODE && 'run_mode' in j) j.run_mode = process.env.RUN_MODE;
         if (!p25 && 'smtp_selfcheck' in j) j.smtp_selfcheck = false;
+        try { const ch = await usage.begin(j); if (ch.length) console.log("Today's fair share of free limits: " + ch.join(', ')); } catch (e) { console.log('Usage tab: ' + e.message); }
         outputs[name] = [{ json: j }];
       } else if (/\.code$/.test(n.type)) {
         const fn = new AsyncFunction('$', '$getWorkflowStaticData', '$env', 'require', n.parameters.jsCode);
@@ -142,6 +144,14 @@ function port25Open() {
   const lastName = order[order.length - 1];
   if (outputs[lastName]) summary.result = outputs[lastName][0].json;
   summary.minutes = Math.round((Date.now() - t0) / 600) / 100;
+  // usage of every service vs its free limit -> "Engine Usage" tab in the sheet (+ a warning on the run page)
+  try {
+    const allNotes = [];
+    for (const k of Object.keys(outputs)) for (const it of outputs[k]) for (const [f, v] of Object.entries(it.json || {})) if (/notes$/i.test(f) && Array.isArray(v)) allNotes.push(...v.map(String));
+    const u = await usage.end(allNotes);
+    summary.usage = u.table; summary.limitWarnings = u.warn;
+    for (const w of u.warn || []) console.log('::warning title=Limit::' + w);
+  } catch (e) { console.log('Usage tab: ' + e.message); }
   console.log('\n===== RESULT =====\n' + JSON.stringify(summary, null, 1).slice(0, 20000));
   if (process.env.GITHUB_STEP_SUMMARY) {
     fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, '## ' + wf.name + '\n```json\n' + JSON.stringify(summary, null, 1).slice(0, 60000) + '\n```\n');
