@@ -1,0 +1,1 @@
+{ "name": "lead-finder-engine", "private": true, "version": "1.0.0", "description": "Daily lead finder + email checker for the outreach sheet. Runs on GitHub Actions.", "engines": { "node": ">=20" } }
