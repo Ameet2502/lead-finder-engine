@@ -27,6 +27,27 @@ jobs:
       - name: Run Daily Lead Engine
         env:
           KEYS_TXT: ${{ secrets.KEYS_TXT }}
+          # each key can also be its own secret (it wins over KEYS_TXT)
+          SHEET_SCRIPT_URL: ${{ secrets.SHEET_SCRIPT_URL }}
+          SHEET_SECRET: ${{ secrets.SHEET_SECRET }}
+          TAVILY_KEY: ${{ secrets.TAVILY_KEY }}
+          GEMINI_KEY: ${{ secrets.GEMINI_KEY }}
+          REOON_KEY: ${{ secrets.REOON_KEY }}
+          LINKUP_KEY: ${{ secrets.LINKUP_KEY }}
+          EXA_KEY: ${{ secrets.EXA_KEY }}
+          FIRECRAWL_KEY: ${{ secrets.FIRECRAWL_KEY }}
+          SERPER_KEY: ${{ secrets.SERPER_KEY }}
+          HUNTER_KEY: ${{ secrets.HUNTER_KEY }}
+          QEV_KEY: ${{ secrets.QEV_KEY }}
+          # daily ceilings (each free allowance is also spread evenly over the month by the engine)
+          TAVILY_DAILY_CAP: '500'
+          EXA_DAILY_CAP: '500'
+          FIRECRAWL_DAILY_CAP: '500'
+          LINKUP_DAILY_CAP: '70'
+          SERPER_DAILY_CAP: '80'
+          REOON_DAILY_CAP: '2000'
+          VERIFIED_PER_SECTION: '50'
+          SHADY_PER_SECTION: '50'
           RUN_MODE: ${{ inputs.mode == 'auto' && '' || inputs.mode }}
         run: node run.js Daily_Lead_Engine.json --state state/daily.json
       - name: Save memory for next run
