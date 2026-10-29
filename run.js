@@ -151,11 +151,13 @@ function port25Open() {
     for (const k of Object.keys(outputs)) for (const it of outputs[k]) for (const [f, v] of Object.entries(it.json || {})) if (/notes$/i.test(f) && Array.isArray(v)) allNotes.push(...v.map(String));
     const u = await usage.end(allNotes);
     summary.usage = u.table; summary.limitWarnings = u.warn;
+    summary.ALERTS = (u.warn && u.warn.length) ? u.warn : 'none';
     for (const w of u.warn || []) console.log('::warning title=Limit::' + w);
   } catch (e) { console.log('Usage tab: ' + e.message); }
-  console.log('\n===== RESULT =====\n' + JSON.stringify(summary, null, 1).slice(0, 20000));
+  const shown = Object.assign({ workflow: summary.workflow, ALERTS: summary.ALERTS === undefined ? 'none' : summary.ALERTS }, summary);   // alerts first, so they are the first thing seen
+  console.log('\n===== RESULT =====\n' + JSON.stringify(shown, null, 1).slice(0, 20000));
   if (process.env.GITHUB_STEP_SUMMARY) {
-    fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, '## ' + wf.name + '\n```json\n' + JSON.stringify(summary, null, 1).slice(0, 60000) + '\n```\n');
+    fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, '## ' + wf.name + '\n```json\n' + JSON.stringify(shown, null, 1).slice(0, 60000) + '\n```\n');
   }
   process.exit(failed ? 1 : 0);
 })().catch((e) => { console.error(e); saveState(); process.exit(1); });
