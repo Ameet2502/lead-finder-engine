@@ -19,6 +19,7 @@ const SERVICES = [
   { id: 'reoon', name: 'Reoon (email check, paid)', key: 'REOON_KEY', store: 'q', cap: 'reoon_daily_cap', total: 'REOON_TOTAL', def: 10000 },
 ];
 const TAB = 'Engine Usage';
+const ALERT = 'ALERTS (top row)';   // row 2 of the tab: the one place to look - lists every service that is low, used up, stopped or has a refused key
 const HEADER = ['Service', 'Free allowance', 'Used today', "Today's share", 'Used this month', 'Used in total', 'Left', 'Status', 'Month', 'Updated (IST)'];
 const ist = () => new Date(Date.now() + 5.5 * 3600e3);
 const today = () => ist().toISOString().slice(0, 10);
@@ -36,7 +37,7 @@ function makeUsage(env, staticData) {
   const allowance = (s) => { const v = Number(env[s.monthly || s.total] || s.def); return v > 0 ? v : 0; };
   const usedToday = (s) => { const q = ((staticData[s.store] || {})[s.id]) || {}; return q.day === today() ? Number(q.used || 0) : 0; };
   const refused = (s) => { const q = ((staticData[s.store] || {})[s.id]) || {}; return q.day === today() && q.off; };
-  let rows = [], before = {}, book = {};
+  let rows = [], before = {}, book = {}, alertOk = false, displaced = '';
 
   return {
     // before the run: read the tab, and lower each service's daily cap to its fair share of what is left
@@ -50,6 +51,13 @@ function makeUsage(env, staticData) {
         if (!s) continue;
         const sameMonth = String(r[ix('Month')]) === month();
         book[s.id] = { row: i + 1, month: sameMonth ? Number(r[ix('Used this month')] || 0) : 0, total: Number(r[ix('Used in total')] || 0) };
+      }
+      // the alert row must be row 2: the first time, it takes over row 2 and the service that sat there is written again at the bottom (its counters are kept)
+      alertOk = rows.length >= 2 && String(rows[1][0]) === ALERT;
+      if (!alertOk && rows.length >= 2 && rows[0][0] === 'Service') {
+        displaced = String(rows[1][0]);
+        const d = SERVICES.find((x) => x.name === displaced);
+        if (d && book[d.id]) book[d.id].row = 0;
       }
       const changes = [];
       for (const s of active) {
@@ -83,18 +91,25 @@ function makeUsage(env, staticData) {
         const left = s.monthly ? A - b.month : A - b.total;
         const note = (notes || []).find((n) => new RegExp('^' + s.id + ' search stopped|^' + s.name.split(' ')[0] + ' stopped', 'i').test(n));
         let status = 'OK';
-        if (refused(s) || note) status = 'STOPPED today - service refused: ' + String(note || 'no credits / rate limit').replace(/^.*?:\s*/, '').slice(0, 80);
+        const why = String(note || 'no credits / rate limit').replace(/^.*?:\s*/, '').slice(0, 80);
+        if (refused(s) || note) status = (/unauthori|invalid|forbidden|denied|\b40[13]\b|api key|not allowed/i.test(why) ? 'STOPPED today - KEY REFUSED (check or replace the key): ' : 'STOPPED today - service refused: ') + why;
         else if (left <= 0) status = s.monthly ? 'MONTHLY FREE LIMIT USED UP - resets on the 1st' : 'FREE CREDITS USED UP - buy more or remove this key';
         else if (left <= A * 0.2) status = 'Running low - ' + Math.round((left / A) * 100) + '% left';
         else if (b.share !== undefined && usedToday(s) >= b.share) status = "OK - today's share used, more tomorrow";
-        if (/USED UP|STOPPED|low/.test(status)) warn.push(s.name + ': ' + status);
+        // alert: stopped / refused key / free credits used up (any service); under 20% left only counts for one-time (lifetime) credits - monthly ones are spread on purpose
+        if (/USED UP|STOPPED/.test(status) || (!s.monthly && /^Running low/.test(status))) warn.push(s.name + ': ' + status);
         out.push({ s, b, row: [s.name, A + (s.monthly ? ' / month' : ' total'), usedToday(s), b.share === undefined ? '' : b.share, b.month, b.total, Math.max(0, left), status, month(), ist().toISOString().slice(0, 16).replace('T', ' ')] });
       }
       try {
         const have = rows.length && rows[0][0] === 'Service';
+        const stamp = ist().toISOString().slice(0, 16).replace('T', ' ');
+        const alertRow = [ALERT, warn.length + ' alert' + (warn.length === 1 ? '' : 's'), '', '', '', '', '', warn.length ? '\u26a0 ' + warn.join('  |  ').slice(0, 900) : '\u2714 All services OK - no alerts', month(), stamp];
         const updates = out.filter((o) => have && o.b.row).map((o) => ({ tab: TAB, row: o.b.row, keyCol: 'Service', key: o.s.name, set: Object.fromEntries(HEADER.map((k, i) => [k, o.row[i]])) }));
+        if (have && alertOk) updates.push({ tab: TAB, row: 2, keyCol: 'Service', key: ALERT, set: Object.fromEntries(HEADER.map((k, i) => [k, alertRow[i]])) });
+        else if (have && displaced) updates.push({ tab: TAB, row: 2, keyCol: 'Service', key: displaced, set: Object.fromEntries(HEADER.map((k, i) => [k, alertRow[i]])) });
         if (updates.length) await sheet('updateCells', { updates });
         const fresh = out.filter((o) => !(have && o.b.row)).map((o) => o.row);
+        if (!have) fresh.unshift(alertRow);                       // brand-new tab: the alert row goes first
         if (fresh.length) await sheet('appendRows', { tab: TAB, header: HEADER, rows: fresh });
       } catch (e) { warn.push('Could not update the Engine Usage tab: ' + String(e.message || e).slice(0, 100)); }
       return { table: out.map((o) => o.row), warn };
